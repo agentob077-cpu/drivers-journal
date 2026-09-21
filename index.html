@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#141210"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Journal"/>
+<link rel="manifest" href="manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<title>Drivers Journal</title>
+<style>
+:root{
+  --bg:#141210;--card:#221e1a;--ink:#f6f1ea;--muted:#9a9288;
+  --line:#3a342e;--accent:#e07030;--accent-ink:#1a120c;--ok:#7dcea0;--bad:#e07a6a;
+  --safe-b:max(16px, env(safe-area-inset-bottom));
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{min-height:100dvh}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.app{max-width:520px;margin:0 auto;padding:18px 16px var(--safe-b);min-height:100dvh}
+.screen{display:none}
+.screen.on{display:block}
+.brand{text-align:center;margin:8px 0 18px}
+.kicker{letter-spacing:.22em;font-size:.72rem;color:var(--accent);font-weight:700}
+h1{margin:4px 0 0;font-size:2.15rem;line-height:.95;letter-spacing:-.03em;text-transform:uppercase}
+.tag{margin:8px 0 0;color:var(--accent);font-style:italic;font-size:1.15rem}
+.sub{color:var(--muted);text-align:center;margin:6px 0 16px}
+.stat{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 0 14px}
+.stat div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 10px;text-align:center}
+.stat b{display:block;font-size:1.25rem;color:var(--accent)}
+.stat span{color:var(--muted);font-size:.75rem}
+.row,.day{width:100%;display:flex;align-items:center;gap:10px;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 8px;min-height:56px}
+.row .v,.day .hrs{margin-left:auto;color:var(--accent);font-weight:700}
+.day .meta{display:block;color:var(--muted);font-size:.82rem;margin-top:2px}
+.day.empty .hrs{color:var(--muted);font-weight:500}
+.btn{width:100%;min-height:52px;border:0;border-radius:14px;font-weight:700;margin-top:8px}
+.btn-p{background:var(--accent);color:var(--accent-ink)}
+.btn-g{background:transparent;border:1px solid var(--accent);color:var(--accent)}
+.btn-m{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.btn-bad{background:transparent;border:1px solid var(--bad);color:var(--bad)}
+.note{color:var(--muted);font-size:.82rem;line-height:1.4}
+.warn{background:#2a2118;border:1px solid var(--accent);color:#f3d2bc;border-radius:12px;padding:10px 12px;font-size:.85rem;margin:10px 0}
+label{display:block;font-weight:700;margin:12px 0 6px}
+input,textarea,select{width:100%;min-height:52px;border-radius:12px;border:1px solid var(--line);background:#100e0c;padding:12px}
+textarea{min-height:88px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.topbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.topbar h2{margin:0;font-size:1.3rem}
+.iconbtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink)}
+.calc{font-size:2rem;font-weight:800;color:var(--accent);margin:8px 0 0}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;z-index:5}
+.sheet.on{display:flex}
+.panel{background:#1c1916;width:100%;max-width:520px;margin:0 auto;border-radius:18px 18px 0 0;padding:16px 16px var(--safe-b)}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.days button{min-height:64px;border-radius:12px;border:1px solid var(--line);background:transparent;padding:6px 2px}
+.days button.on{border-color:var(--accent);color:var(--accent)}
+.days button small{display:block;color:var(--muted)}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+pre.export{white-space:pre-wrap;background:#100e0c;border-radius:12px;padding:12px;font-size:.78rem}
+</style>
+</head>
+<body>
+<div class="app">
+  <section id="home" class="screen on">
+    <header class="brand">
+      <div class="kicker">PERSONAL LOG</div>
+      <h1>Drivers<br>Journal</h1>
+      <p class="tag">logging the dream</p>
+    </header>
+    <p class="sub" id="subLine"></p>
+    <div class="stat">
+      <div><b id="stHours">0:00</b><span>worked</span></div>
+      <div><b id="stPoa">0:00</b><span>POA</span></div>
+      <div><b id="stDays">0/7</b><span>days</span></div>
+    </div>
+    <button class="row" id="bWeek" type="button"><span>Week commencing</span><span class="v" id="vWeek">—</span></button>
+    <button class="row" id="bDriver" type="button"><span>Driver</span><span class="v" id="vDriver"></span></button>
+    <button class="row" id="bBranch" type="button"><span>Branch · cost centre</span><span class="v" id="vBranch"></span></button>
+    <div id="dayList"></div>
+    <button class="btn btn-g" id="copyLast" type="button">Copy last logged day</button>
+    <button class="btn btn-p" id="openWeek" type="button">Week summary</button>
+    <p class="note">Saved on this phone only. Export a backup before you clear the browser. This is your organiser, not an official agency timesheet.</p>
+  </section>
+
+  <section id="day" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" id="dayBack" type="button" aria-label="Back">←</button>
+      <h2 id="dayTitle">Day</h2>
+    </div>
+    <label for="company">Company & site</label>
+    <input id="company" autocomplete="organization" placeholder="e.g. Asda Bedford"/>
+    <div class="grid2">
+      <div>
+        <label for="start">Start</label>
+        <input id="start" type="time"/>
+      </div>
+      <div>
+        <label for="finish">Finish</label>
+        <input id="finish" type="time"/>
+      </div>
+    </div>
+    <div class="grid2">
+      <div>
+        <label for="unpaid">Unpaid break (min)</label>
+        <input id="unpaid" type="number" inputmode="numeric" min="0" step="1" value="0"/>
+      </div>
+      <div>
+        <label for="paid">Paid break (min)</label>
+        <input id="paid" type="number" inputmode="numeric" min="0" step="1" value="0"/>
+      </div>
+    </div>
+    <div class="grid2">
+      <div>
+        <label for="poaH">POA hours</label>
+        <input id="poaH" type="number" inputmode="numeric" min="0" step="1" value="0"/>
+      </div>
+      <div>
+        <label for="poaM">POA minutes</label>
+        <input id="poaM" type="number" inputmode="numeric" min="0" max="59" step="1" value="0"/>
+      </div>
+    </div>
+    <label for="notes">Notes</label>
+    <textarea id="notes" placeholder="Yard delay, trailer number, anything you want to remember"></textarea>
+    <div class="calc" id="calc">0:00</div>
+    <p class="note" id="calcHint">Worked = finish − start − unpaid. Overnight is allowed. Paid breaks and POA are tracked, not deducted.</p>
+    <p class="warn" id="dayErr" hidden></p>
+    <button class="btn btn-p" id="saveDay" type="button">Save day</button>
+    <button class="btn btn-bad" id="clearDay" type="button">Clear this day</button>
+  </section>
+
+  <section id="week" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" id="weekBack" type="button" aria-label="Back">←</button>
+      <h2>Week</h2>
+    </div>
+    <p class="sub" id="weekLabel" style="text-align:left"></p>
+    <div class="stat">
+      <div><b id="wHours">0:00</b><span>worked</span></div>
+      <div><b id="wPoa">0:00</b><span>POA</span></div>
+      <div><b id="wPaid">0</b><span>paid min</span></div>
+    </div>
+    <div id="weekCards"></div>
+    <div class="warn">Email draft only. Check the agency still wants Northampton driving, and that this text is enough. Company signature still has to be done their way.</div>
+    <button class="btn btn-p" id="email" type="button">Draft Monday email</button>
+    <button class="btn btn-g" id="copyText" type="button">Copy week text</button>
+    <button class="btn btn-g" id="download" type="button">Download backup</button>
+    <p class="note" id="copyOk" hidden>Copied.</p>
+  </section>
+</div>
+
+<div class="sheet" id="sheet">
+  <div class="panel">
+    <div class="nav">
+      <button class="iconbtn" id="prevW" type="button" aria-label="Previous week">‹</button>
+      <strong id="calTitle">Week</strong>
+      <button class="iconbtn" id="nextW" type="button" aria-label="Next week">›</button>
+    </div>
+    <div class="days" id="calDays"></div>
+    <button class="btn btn-p" id="useWeek" type="button">Use this week</button>
+    <button class="btn btn-m" id="closeCal" type="button">Cancel</button>
+  </div>
+</div>
+
+<script>
+const KEY = "dj-bender-v1";
+const IMPORT_KEY = "gi-ts-v2";
+const MAIL = "northampton.driving@gigroup.com";
+const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const $ = (id) => document.getElementById(id);
+
+function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function parseISO(s){const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
+function sunday(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-x.getDay());return iso(x)}
+function fmt(s){return parseISO(s).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}
+function fmtLong(s){return parseISO(s).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}
+function hm(mins){mins=Math.max(0,Math.round(mins||0));return Math.floor(mins/60)+":"+String(mins%60).padStart(2,"0")}
+function toMin(t){if(!/^\d{2}:\d{2}$/.test(t||""))return null;const [h,m]=t.split(":").map(Number);if(h>23||m>59)return null;return h*60+m}
+function worked(start,finish,unpaid){
+  const a=toMin(start), b=toMin(finish);
+  if(a==null||b==null) return null;
+  let d=b-a; if(d<=0) d+=1440;
+  return Math.max(0, d-(Number(unpaid)||0));
+}
+function blank(){return {company:"",start:"",finish:"",unpaid:0,paid:0,poa:0,notes:""}}
+function emptyWeek(){return {days:Array(7).fill(null)}}
+function defaultStore(){
+  const wc=sunday(new Date());
+  return {v:1,current:wc,driver:"Augustine Corion",branch:"Northampton",cost:"Driving",weeks:{[wc]:emptyWeek()}};
+}
+function fromOld(raw){
+  if(!raw||!raw.weeks) return null;
+  const store=defaultStore();
+  store.driver=raw.driverName||store.driver;
+  store.branch=raw.branch||store.branch;
+  store.cost=raw.costCentre||store.cost;
+  store.current=sunday(parseISO(raw.currentWeek||store.current));
+  store.weeks={};
+  Object.keys(raw.weeks).forEach((k)=>{
+    const sk=sunday(parseISO(k));
+    const days=(raw.weeks[k].days||[]).map((d)=>{
+      if(!d) return null;
+      return {company:d.companySite||"",start:d.start||"",finish:d.finish||"",unpaid:Number(d.unpaidBreaks)||0,paid:Number(d.paidBreaks)||0,poa:Number(d.poaMinutes)||0,notes:""};
+    });
+    while(days.length<7) days.push(null);
+    store.weeks[sk]={days:days.slice(0,7)};
+  });
+  if(!store.weeks[store.current]) store.weeks[store.current]=emptyWeek();
+  return store;
+}
+function load(){
+  try{
+    const mine=JSON.parse(localStorage.getItem(KEY)||"null");
+    if(mine&&mine.v===1&&mine.weeks) return mine;
+  }catch(e){}
+  try{
+    const old=fromOld(JSON.parse(localStorage.getItem(IMPORT_KEY)||"null"));
+    if(old) return old;
+  }catch(e){}
+  return defaultStore();
+}
+let S=load();
+let cal=S.current;
+let editing=null;
+
+function save(){localStorage.setItem(KEY, JSON.stringify(S))}
+function week(){if(!S.weeks[S.current]) S.weeks[S.current]=emptyWeek();return S.weeks[S.current]}
+function totals(w){
+  return (w.days||[]).reduce((a,d)=>{
+    if(!d) return a;
+    const mins=worked(d.start,d.finish,d.unpaid)||0;
+    a.hours+=mins; a.poa+=Number(d.poa)||0; a.paid+=Number(d.paid)||0; a.n++;
+    return a;
+  },{hours:0,poa:0,paid:0,n:0});
+}
+function show(id){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));$(id).classList.add("on");window.scrollTo(0,0)}
+
+function paintHome(){
+  const t=totals(week());
+  $("subLine").textContent=S.branch+" · "+S.cost;
+  $("vWeek").textContent=fmt(S.current);
+  $("vDriver").textContent=S.driver;
+  $("vBranch").textContent=S.branch+" · "+S.cost;
+  $("stHours").textContent=hm(t.hours);
+  $("stPoa").textContent=hm(t.poa);
+  $("stDays").textContent=t.n+"/7";
+  const list=$("dayList"); list.innerHTML="";
+  DAYS.forEach((name,i)=>{
+    const d=week().days[i];
+    const date=parseISO(S.current); date.setDate(date.getDate()+i);
+    const b=document.createElement("button");
+    b.type="button"; b.className="day"+(d?"":" empty");
+    const hrs=d?hm(worked(d.start,d.finish,d.unpaid)):"Log";
+    const meta=d?(d.company||"No site")+" · "+d.start+"–"+d.finish:"Tap to log";
+    b.innerHTML="<div><strong>"+name+" "+date.getDate()+"</strong><span class='meta'></span></div><span class='hrs'></span>";
+    b.querySelector(".meta").textContent=meta;
+    b.querySelector(".hrs").textContent=hrs;
+    b.onclick=()=>openDay(i);
+    list.appendChild(b);
+  });
+}
+function openDay(i){
+  editing=i;
+  const d=week().days[i]||blank();
+  const date=parseISO(S.current); date.setDate(date.getDate()+i);
+  $("dayTitle").textContent=DAYS[i]+" "+fmtLong(iso(date));
+  $("company").value=d.company||"";
+  $("start").value=d.start||"";
+  $("finish").value=d.finish||"";
+  $("unpaid").value=d.unpaid||0;
+  $("paid").value=d.paid||0;
+  $("poaH").value=Math.floor((d.poa||0)/60);
+  $("poaM").value=(d.poa||0)%60;
+  $("notes").value=d.notes||"";
+  $("dayErr").hidden=true;
+  paintCalc();
+  show("day");
+}
+function paintCalc(){
+  const m=worked($("start").value,$("finish").value,$("unpaid").value);
+  $("calc").textContent=m==null?"—":hm(m);
+}
+function readDay(){
+  const company=$("company").value.trim();
+  const start=$("start").value, finish=$("finish").value;
+  const unpaid=Number($("unpaid").value||0), paid=Number($("paid").value||0);
+  const poaH=Number($("poaH").value||0), poaM=Number($("poaM").value||0);
+  if(!company) return {error:"Add the company and site."};
+  if(toMin(start)==null||toMin(finish)==null) return {error:"Start and finish need a valid time."};
+  if(unpaid<0||paid<0||poaH<0||poaM<0||poaM>59) return {error:"Breaks and POA minutes must be 0–59, hours 0 or more."};
+  const mins=worked(start,finish,unpaid);
+  if(mins==null) return {error:"Could not work out the hours."};
+  return {company,start,finish,unpaid,paid,poa:poaH*60+poaM,notes:$("notes").value.trim()};
+}
+function weekText(){
+  const t=totals(week());
+  const lines=[
+    "Drivers Journal — personal log",
+    "Driver: "+S.driver,
+    "Branch: "+S.branch,
+    "Cost centre: "+S.cost,
+    "Week commencing: "+fmtLong(S.current),
+    ""
+  ];
+  DAYS.forEach((name,i)=>{
+    const d=week().days[i];
+    const date=parseISO(S.current); date.setDate(date.getDate()+i);
+    if(!d){lines.push(name+" "+fmt(iso(date))+": —");return}
+    lines.push(name+" "+fmt(iso(date))+": "+d.company+" | "+d.start+"–"+d.finish+" | unpaid "+d.unpaid+"m | worked "+hm(worked(d.start,d.finish,d.unpaid))+" | POA "+hm(d.poa)+" | paid "+d.paid+"m"+(d.notes?" | "+d.notes:""));
+  });
+  lines.push("","Total worked: "+hm(t.hours),"Total POA: "+hm(t.poa),"Paid breaks: "+t.paid+" min","","Not an official timesheet. Check before sending.");
+  return lines.join("\n");
+}
+function paintWeek(){
+  const t=totals(week());
+  $("weekLabel").textContent="Week commencing "+fmtLong(S.current)+" · "+S.driver;
+  $("wHours").textContent=hm(t.hours);
+  $("wPoa").textContent=hm(t.poa);
+  $("wPaid").textContent=String(t.paid);
+  const box=$("weekCards"); box.innerHTML="";
+  DAYS.forEach((name,i)=>{
+    const d=week().days[i];
+    const el=document.createElement("button");
+    el.type="button"; el.className="day"+(d?"":" empty");
+    el.innerHTML="<div><strong></strong><span class='meta'></span></div><span class='hrs'></span>";
+    el.querySelector("strong").textContent=name;
+    el.querySelector(".meta").textContent=d?(d.company+" · "+d.start+"–"+d.finish):"Not logged";
+    el.querySelector(".hrs").textContent=d?hm(worked(d.start,d.finish,d.unpaid)):"—";
+    el.onclick=()=>openDay(i);
+    box.appendChild(el);
+  });
+}
+function paintCal(){
+  $("calTitle").textContent="w/c "+fmtLong(cal);
+  const box=$("calDays"); box.innerHTML="";
+  const base=parseISO(cal);
+  DAYS.forEach((name,i)=>{
+    const dt=new Date(base); dt.setDate(base.getDate()+i);
+    const b=document.createElement("button");
+    b.type="button"; if(i===0) b.classList.add("on");
+    b.innerHTML=name+"<small>"+dt.getDate()+"</small>";
+    b.onclick=()=>{cal=sunday(dt);paintCal()};
+    box.appendChild(b);
+  });
+}
+function lastLogged(){
+  const days=week().days;
+  for(let i=days.length-1;i>=0;i--) if(days[i]) return days[i];
+  const keys=Object.keys(S.weeks).sort().reverse();
+  for(const k of keys){
+    const ds=(S.weeks[k].days||[]).filter(Boolean);
+    if(ds.length) return ds[ds.length-1];
+  }
+  return null;
+}
+
+$("bWeek").onclick=()=>{cal=S.current;paintCal();$("sheet").classList.add("on")};
+$("closeCal").onclick=()=>$("sheet").classList.remove("on");
+$("sheet").onclick=(e)=>{if(e.target.id==="sheet") $("sheet").classList.remove("on")};
+$("prevW").onclick=()=>{const d=parseISO(cal);d.setDate(d.getDate()-7);cal=sunday(d);paintCal()};
+$("nextW").onclick=()=>{const d=parseISO(cal);d.setDate(d.getDate()+7);cal=sunday(d);paintCal()};
+$("useWeek").onclick=()=>{S.current=cal;if(!S.weeks[S.current]) S.weeks[S.current]=emptyWeek();save();$("sheet").classList.remove("on");paintHome()};
+function editProfile(which){
+  if(which==="driver"){
+    const v=prompt("Driver name", S.driver); if(v&&v.trim()) S.driver=v.trim();
+  }else{
+    const b=prompt("Branch", S.branch); if(b&&b.trim()) S.branch=b.trim();
+    const c=prompt("Cost centre", S.cost); if(c&&c.trim()) S.cost=c.trim();
+  }
+  save(); paintHome();
+}
+$("bDriver").onclick=()=>editProfile("driver");
+$("bBranch").onclick=()=>editProfile("branch");
+$("openWeek").onclick=()=>{paintWeek();show("week")};
+$("weekBack").onclick=()=>{paintHome();show("home")};
+$("dayBack").onclick=()=>{paintHome();show("home")};
+["start","finish","unpaid"].forEach(id=>$(id).addEventListener("input", paintCalc));
+$("saveDay").onclick=()=>{
+  const row=readDay();
+  if(row.error){$("dayErr").hidden=false;$("dayErr").textContent=row.error;return}
+  week().days[editing]=row; save(); paintHome(); show("home");
+};
+$("clearDay").onclick=()=>{
+  if(!confirm("Clear this day?")) return;
+  week().days[editing]=null; save(); paintHome(); show("home");
+};
+$("copyLast").onclick=()=>{
+  const src=lastLogged();
+  if(!src){alert("No logged day to copy yet.");return}
+  const empty=week().days.findIndex(d=>!d);
+  const i=empty===-1?0:empty;
+  week().days[i]=Object.assign({}, src);
+  save(); openDay(i);
+};
+$("email").onclick=()=>{
+  const subject="Drivers Journal "+S.driver+" w/c "+fmtLong(S.current);
+  location.href="mailto:"+MAIL+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(weekText());
+};
+$("copyText").onclick=async()=>{
+  try{await navigator.clipboard.writeText(weekText());$("copyOk").hidden=false}catch(e){alert(weekText())}
+};
+$("download").onclick=()=>{
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="drivers-journal-"+S.current+".json";
+  a.click();
+};
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+}
+paintHome();
+</script>
+</body>
+</html>
