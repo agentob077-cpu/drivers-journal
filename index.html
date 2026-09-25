@@ -21,7 +21,8 @@ html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-
 body{min-height:100dvh}
 button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer;-webkit-tap-highlight-color:transparent}
-.app{max-width:520px;margin:0 auto;padding:18px 16px var(--safe-b);min-height:100dvh}
+.app{max-width:520px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 18px) 16px var(--safe-b);min-height:100dvh}
+html,body{overscroll-behavior-y:none}
 .screen{display:none}
 .screen.on{display:block}
 .brand{text-align:center;margin:8px 0 18px}
@@ -48,7 +49,19 @@ label{display:block;font-weight:700;margin:12px 0 6px}
 input,textarea,select{width:100%;min-height:52px;border-radius:12px;border:1px solid var(--line);background:#100e0c;padding:12px}
 textarea{min-height:88px;resize:vertical}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.topbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.topbar{display:flex;align-items:center;gap:8px;margin:0 -16px 8px;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;position:sticky;top:0;z-index:4;background:var(--bg);border-bottom:1px solid var(--line)}
+.screen .topbar{margin-top:calc(-18px - env(safe-area-inset-top))}
+.topbar .grow{flex:1}
+.cal{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}
+.cal th{color:var(--muted);font-size:.72rem;font-weight:600;padding:4px 0}
+.cal td{background:var(--card);border:1px solid var(--line);border-radius:9px;height:54px;vertical-align:top;padding:4px 3px;font-size:.72rem;text-align:center}
+.cal td.out{opacity:.35}
+.cal td.has{border-color:var(--accent)}
+.cal td .n{display:block;color:var(--muted)}
+.cal td .h{display:block;color:var(--accent);font-weight:700;margin-top:3px}
+.cal td.tot{background:transparent;border:0;color:var(--ink);font-weight:800;vertical-align:middle}
+.cal tr.wk{cursor:pointer}
+.cal tr.wk.cur td:not(.tot){box-shadow:inset 0 0 0 1px var(--accent)}
 .topbar h2{margin:0;font-size:1.3rem}
 .iconbtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink)}
 .calc{font-size:2rem;font-weight:800;color:var(--accent);margin:8px 0 0}
@@ -83,6 +96,7 @@ pre.export{white-space:pre-wrap;background:#100e0c;border-radius:12px;padding:12
     <div id="dayList"></div>
     <button class="btn btn-g" id="copyLast" type="button">Copy last logged day</button>
     <button class="btn btn-p" id="openWeek" type="button">Week summary</button>
+    <button class="btn btn-g" id="openCal" type="button">📅 Past weeks calendar</button>
     <p class="note">Saved on this phone only. Export a backup before you clear the browser. This is your organiser, not an official agency timesheet.</p>
   </section>
 
@@ -135,7 +149,9 @@ pre.export{white-space:pre-wrap;background:#100e0c;border-radius:12px;padding:12
   <section id="week" class="screen">
     <div class="topbar">
       <button class="iconbtn" id="weekBack" type="button" aria-label="Back">←</button>
-      <h2>Week</h2>
+      <h2 class="grow">Week</h2>
+      <button class="iconbtn" id="wPrev" type="button" aria-label="Previous week">‹</button>
+      <button class="iconbtn" id="wNext" type="button" aria-label="Next week">›</button>
     </div>
     <p class="sub" id="weekLabel" style="text-align:left"></p>
     <div class="stat">
@@ -149,6 +165,20 @@ pre.export{white-space:pre-wrap;background:#100e0c;border-radius:12px;padding:12
     <button class="btn btn-g" id="copyText" type="button">Copy week text</button>
     <button class="btn btn-g" id="download" type="button">Download backup</button>
     <p class="note" id="copyOk" hidden>Copied.</p>
+    <button class="btn btn-m" id="weekBack2" type="button">← Back to home</button>
+  </section>
+
+  <section id="history" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" id="histBack" type="button" aria-label="Back">←</button>
+      <h2 class="grow" id="histTitle">Calendar</h2>
+      <button class="iconbtn" id="mPrev" type="button" aria-label="Previous month">‹</button>
+      <button class="iconbtn" id="mNext" type="button" aria-label="Next month">›</button>
+    </div>
+    <p class="note">Tap any week row to open that week. Hours shown are worked hours.</p>
+    <table class="cal"><thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Week</th></tr></thead><tbody id="calBody"></tbody></table>
+    <p class="sub" id="monthTotal"></p>
+    <button class="btn btn-m" id="histBack2" type="button">← Back to home</button>
   </section>
 </div>
 
@@ -376,6 +406,37 @@ $("bDriver").onclick=()=>editProfile("driver");
 $("bBranch").onclick=()=>editProfile("branch");
 $("openWeek").onclick=()=>{paintWeek();show("week")};
 $("weekBack").onclick=()=>{paintHome();show("home")};
+$("weekBack2").onclick=()=>{paintHome();show("home")};
+function shiftWeek(n){const d=parseISO(S.current);d.setDate(d.getDate()+7*n);S.current=sunday(d);save();paintWeek()}
+$("wPrev").onclick=()=>shiftWeek(-1);
+$("wNext").onclick=()=>shiftWeek(1);
+let mon=parseISO(S.current);mon.setDate(1);
+function paintHistory(){
+  $("histTitle").textContent=mon.toLocaleDateString("en-GB",{month:"long",year:"numeric"});
+  const body=$("calBody");body.innerHTML="";
+  const first=parseISO(sunday(mon));const m=mon.getMonth();let mt=0;
+  for(let w=new Date(first);w.getMonth()===m||w<mon;w.setDate(w.getDate()+7)){
+    const wk=iso(w),data=S.weeks[wk],tr=document.createElement("tr");
+    tr.className="wk"+(wk===S.current?" cur":"");let tot=0;
+    for(let i=0;i<7;i++){
+      const dt=new Date(w);dt.setDate(w.getDate()+i);
+      const d=data&&data.days[i];const td=document.createElement("td");
+      const mins=d?worked(d.start,d.finish,d.unpaid)||0:0;tot+=mins;
+      if(dt.getMonth()===m&&d) mt+=mins;
+      td.className=(dt.getMonth()!==m?"out ":"")+(d?"has":"");
+      td.innerHTML="<span class='n'>"+dt.getDate()+"</span>"+(d?"<span class='h'>"+hm(mins)+"</span>":"");
+      tr.appendChild(td);
+    }
+    const t=document.createElement("td");t.className="tot";t.textContent=tot?hm(tot):"—";tr.appendChild(t);
+    tr.onclick=()=>{S.current=wk;if(!S.weeks[wk])S.weeks[wk]=emptyWeek();save();paintWeek();show("week")};
+    body.appendChild(tr);
+  }
+  $("monthTotal").textContent="Month total (days in "+mon.toLocaleDateString("en-GB",{month:"long"})+"): "+hm(mt);
+}
+$("openCal").onclick=()=>{mon=parseISO(S.current);mon.setDate(1);paintHistory();show("history")};
+$("mPrev").onclick=()=>{mon.setMonth(mon.getMonth()-1);paintHistory()};
+$("mNext").onclick=()=>{mon.setMonth(mon.getMonth()+1);paintHistory()};
+$("histBack").onclick=$("histBack2").onclick=()=>{paintHome();show("home")};
 $("dayBack").onclick=()=>{paintHome();show("home")};
 ["start","finish","unpaid"].forEach(id=>$(id).addEventListener("input", paintCalc));
 $("saveDay").onclick=()=>{
