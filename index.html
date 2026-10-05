@@ -52,6 +52,15 @@ textarea{min-height:88px;resize:vertical}
 .topbar{display:flex;align-items:center;gap:8px;margin:0 -16px 8px;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;position:sticky;top:0;z-index:4;background:var(--bg);border-bottom:1px solid var(--line)}
 .screen .topbar{margin-top:calc(-18px - env(safe-area-inset-top))}
 .topbar .grow{flex:1}
+ .tw{overflow-x:auto;margin:0 -8px 10px}
+.wt{width:100%;border-collapse:collapse;font-size:.74rem}
+.wt th{color:var(--muted);font-weight:600;text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+.wt td{padding:9px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+.wt td:nth-child(2){white-space:normal;min-width:70px}
+.wt td.w{color:var(--accent);font-weight:700}
+.wt tr.empty td{color:var(--muted)}
+.wt tr.nt td{color:var(--muted);white-space:normal;padding-top:0}
+.wt tr.ft td{font-weight:800;border-bottom:0}
 .cal{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}
 .cal th{color:var(--muted);font-size:.72rem;font-weight:600;padding:4px 0}
 .cal td{background:var(--card);border:1px solid var(--line);border-radius:9px;height:54px;vertical-align:top;padding:4px 3px;font-size:.72rem;text-align:center}
@@ -351,17 +360,23 @@ function paintWeek(){
   $("wPoa").textContent=hm(t.poa);
   $("wPaid").textContent=String(t.paid);
   const box=$("weekCards"); box.innerHTML="";
+  const wrap=document.createElement("div");wrap.className="tw";
+  const tb=document.createElement("table");tb.className="wt";
+  tb.innerHTML="<thead><tr><th>Day</th><th>Site</th><th>Start</th><th>Fin</th><th>Unpaid</th><th>Paid</th><th>POA</th><th>Worked</th></tr></thead>";
+  const body=document.createElement("tbody");
   DAYS.forEach((name,i)=>{
     const d=week().days[i];
-    const el=document.createElement("button");
-    el.type="button"; el.className="day"+(d?"":" empty");
-    el.innerHTML="<div><strong></strong><span class='meta'></span></div><span class='hrs'></span>";
-    el.querySelector("strong").textContent=name;
-    el.querySelector(".meta").textContent=d?(d.company+" · "+d.start+"–"+d.finish):"Not logged";
-    el.querySelector(".hrs").textContent=d?hm(worked(d.start,d.finish,d.unpaid)):"—";
-    el.onclick=()=>openDay(i);
-    box.appendChild(el);
+    const dt=parseISO(S.current);dt.setDate(dt.getDate()+i);
+    const tr=document.createElement("tr");tr.className=d?"":"empty";
+    const cells=d?[name+" "+dt.getDate(),d.company,d.start,d.finish,d.unpaid+"m",d.paid+"m",hm(d.poa),hm(worked(d.start,d.finish,d.unpaid))]:[name+" "+dt.getDate(),"Not logged","","","","","",""];
+    cells.forEach((c,k)=>{const td=document.createElement("td");td.textContent=c;if(k===7)td.className="w";tr.appendChild(td)});
+    tr.onclick=()=>openDay(i);body.appendChild(tr);
+    if(d&&d.notes){const n=document.createElement("tr");n.className="nt";const td=document.createElement("td");td.colSpan=8;td.textContent="Notes: "+d.notes;n.appendChild(td);n.onclick=()=>openDay(i);body.appendChild(n)}
   });
+  const f=document.createElement("tr");f.className="ft";
+  const un=(week().days||[]).reduce((a,d)=>a+(d?Number(d.unpaid)||0:0),0);
+  ["Total","","","",un+"m",t.paid+"m",hm(t.poa),hm(t.hours)].forEach((c,k)=>{const td=document.createElement("td");td.textContent=c;if(k===7)td.className="w";f.appendChild(td)});
+  body.appendChild(f);tb.appendChild(body);wrap.appendChild(tb);box.appendChild(wrap);
 }
 function paintCal(){
   $("calTitle").textContent="w/c "+fmtLong(cal);
